@@ -26,7 +26,6 @@ def do_edges_overlap(line_a, line_b):
 
     d0 = np.dot(line_b[0], u)
     d1 = np.dot(line_b[1], u)
-    print(f"d0: {d0}, d1: {d1}, len_a: {len_a}")
     def inside(d):
         return d >= -TOL and d <= len_a + TOL
     def outside(d):
@@ -43,10 +42,8 @@ def find_overlapping_edges(a: Electrode, b: Electrode) -> Optional[Tuple[int, in
     """
     for edge_a, edge_b in itertools.product(range(a.num_edges()), range(b.num_edges())):
         if do_edges_overlap(a.offset_edge(edge_a), b.offset_edge(edge_b)):
-            if(edge_a == 0 and edge_b == 0):
-                print(f"{a.offset_edge(edge_a)} / {b.offset_edge(edge_b)}")
             return (edge_a, edge_b)
-    
+
     return None
 
 def are_edges_flipped(a, b):
@@ -71,7 +68,6 @@ def crenellate_electrodes(
             raise ValueError("No overlapping edges found to crenellate")
         edge_a_idx, edge_b_idx = edges
 
-    print(f"Edge {edge_a_idx} to {edge_b_idx}")
     edge_a = a.offset_edge(edge_a_idx)
     edge_b = b.offset_edge(edge_b_idx)
     if np.linalg.norm(edge_a) < np.linalg.norm(edge_b):

@@ -1,12 +1,21 @@
 import itertools
 import math
+import numpy as np
 import pyclipper
 from typing import Tuple
-from .types import Electrode, Grid
+from .types import BoardDesign, Electrode, Grid, Peripheral
 from .crenellation import crenellate_electrodes
 
-def new_grid_square(size: float): 
+def new_grid_square(size: float):
     return [(0.,0.), (0., size), (size, size), (size, 0.)]
+
+def transform_points(points, xy, rot):
+    c = math.cos(rot)
+    s = math.sin(rot)
+    R = np.array([[c, -s], [s, c]])
+    points = np.dot(R, np.array(points).T).T
+    points += np.array(xy)
+    return list(map(tuple, points)) # convert to list of 2-tuples
 
 def reduce_board_to_electrodes(board):
     electrodes = []
@@ -14,9 +23,10 @@ def reduce_board_to_electrodes(board):
         for pos, e in grid.electrodes.items():
             electrodes.append(e)
 
-            # origin = (pos[0] * grid.pitch, pos[1] * grid.pitch)
-            # scaled_points = [(p[0] * grid.pitch, p[1] * grid.pitch) for p in e.points]
-            # electrodes.append(Electrode(scaled_points, origin, e.refdes))
+    for periph in board.peripherals:
+        for e in periph.electrodes:
+            electrodes.append(e['electrode'])
+
     return electrodes
 
 def offset_polygon(poly, offset):
@@ -33,7 +43,6 @@ def crenellate_grid(grid, num_digits, theta, margin):
                 if other in grid.electrodes:
                     a = grid.electrodes[(x, y)]
                     b = grid.electrodes[other]
-                    print(f"Crenellating {(x, y)} with {other}")
                     try:
                         crenellate_electrodes(a, b, num_digits, theta, margin)
                     except ValueError:
@@ -43,17 +52,37 @@ def crenellate_grid(grid, num_digits, theta, margin):
 class Constructor(object):
     def __init__(self):
         self.next_refdes = 1
+        self.next_periph_id = 1
 
     def get_refdes(self):
         refdes = self.next_refdes
         self.next_refdes += 1
         return refdes
 
+    def get_periph_id(self):
+        id = self.next_periph_id
+        self.next_periph_id += 1
+        return id
+
+    def add_peripheral(
+            self,
+            board: BoardDesign,
+            peripheral: Peripheral,
+            position: Tuple[float, float],
+            rotation: float):
+        peripheral.id = self.get_periph_id()
+        for e in peripheral.electrodes:
+            e['electrode'].refdes = self.get_refdes()
+        peripheral.origin = position
+        peripheral.rotation = rotation
+        board.peripherals.append(peripheral)
+
     def fill(self, grid: Grid, pos: Tuple[int, int]):
         grid.electrodes[pos] = Electrode(
             points=new_grid_square(grid.pitch),
-            origin=(pos[0] * grid.pitch + grid.origin[0], pos[1] * grid.pitch + grid.origin[1]),
-            refdes=self.get_refdes())
+            origin=(pos[0] * grid.pitch, pos[1] * grid.pitch),
+            refdes=self.get_refdes(),
+            parent=grid)
 
     def fill_rect(self, grid: Grid, pos: Tuple[int, int], size: Tuple[int, int]):
         xpts = range(pos[0], pos[0] + size[0])
@@ -63,7 +92,7 @@ class Constructor(object):
                 raise ValueError(f"Filling rectangle ({pos}/{size}) exceeds grid size ({grid.size})")
             if (x, y) not in grid.electrodes:
                 self.fill(grid, (x, y))
-    
+
     def fill_vert(self, grid: Grid, start: Tuple[int, int], distance: int):
         """Fill a vertical line
 

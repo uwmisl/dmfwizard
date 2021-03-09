@@ -2,20 +2,50 @@ import itertools
 import numpy as np
 from typing import Dict, List, Tuple
 
+def make_transform_matrix(rotation, translation):
+    c = np.cos(rotation)
+    s = np.sin(rotation)
+    return np.array([
+        [c, -s, translation[0]],
+        [s, c, translation[1]],
+        [0., 0., 1.]
+        ])
 
-class Electrode(object):
+class GeometryContainer(object):
+    def __init__(self, origin: Tuple[float, float]=(0.0, 0.0), parent: 'GeometryContainer'=None, rotation: float=0.0):
+        if origin is None:
+            origin = np.array([0., 0.])
+        self._parent = parent
+        self.origin = origin
+        self.rotation = rotation
+
+    @property
+    def parent(self):
+        return self._parent
+
+    def transform_matrix(self):
+        M = make_transform_matrix(self.rotation, self.origin)
+        if self._parent is not None:
+            M = np.dot(self._parent.transform_matrix(), M)
+        return M
+
+
+class Electrode(GeometryContainer):
     def __init__(
             self,
             points: List[Tuple[float, float]]=None,
             origin: Tuple[float, float]=(0.0, 0.0),
-            refdes: int=-1
+            refdes: int=-1,
+            parent: GeometryContainer=None,
         ):
+        super().__init__(origin, parent)
         self.origin = origin
         self.refdes = refdes
         if points is None:
             self.points = []
         else:
             self.points = points
+        self._parent
 
     def num_edges(self):
         return len(self.points)
@@ -24,10 +54,14 @@ class Electrode(object):
         return self.points[n]
 
     def offset_point(self, n):
-        return (self.points[n][0] + self.origin[0], self.points[n][1] + self.origin[1])
+        M = self.transform_matrix()
+        return np.dot(M, tuple(self.points[n]) + (1.0,))[0:2]
 
     def offset_points(self):
-        return [(p[0] + self.origin[0], p[1] + self.origin[1]) for p in self.points]
+        M = self.transform_matrix()
+        points = np.column_stack([np.array(self.points), np.ones(len(self.points))])
+        offset_points = np.dot(M, points.T).T[:, 0:2]
+        return offset_points.tolist()
 
     def offset_edge(self, n: int):
         if n >= len(self.points):
@@ -57,34 +91,40 @@ class Electrode(object):
         if prune_duplicates and np.linalg.norm(np.array(self.points[nextidx]) - np.array(points[-1])) < 0.001:
             end = -1
         self.points[index:index] = points[start:end]
-    
+
     def insert_offset_points(self, index, points, prune_duplicates=True):
         """Insert points in the global coordinate system
 
         Subtracts origin offset for convenience
         """
-        offset_points = [(p[0] - self.origin[0], p[1] - self.origin[1]) for p in points]
-        self.insert_points(index, offset_points, prune_duplicates)
+        M = np.linalg.inv(self.transform_matrix())
+        points = np.column_stack((np.array(points), np.ones(len(points))))
+        points = np.dot(M, points.T).T[:, 0:2].tolist()
+        self.insert_points(index, points, prune_duplicates)
 
-class Peripheral(object):
+class Peripheral(GeometryContainer):
     """A peripheral is a set of electrodes conceptually grouped together
 
     For example: a reservoir.
     """
-    def __init__(self, peripheral_class: str, peripheral_type: str):
+    def __init__(self, peripheral_class: str, peripheral_type: str, parent=None):
+        super().__init__(origin=(0.0, 0.0), rotation=0.0, parent=parent)
         self.peripheral_class = peripheral_class
         self.peripheral_type = peripheral_type
         self.id = None
-        self.origin = (0.0, 0.0)
-        self.rotation = 0.0
         self.electrodes: List[Dict] = []
-    
-    def add_electrode(self, id: int, electrode: Electrode, origin:Tuple[float, float]=(0.0, 0.0)):
+
+    def add_electrode(self, id: str, electrode: Electrode, origin:Tuple[float, float]=(0.0, 0.0)):
         self.electrodes.append({
             'id': id,
             'electrode': electrode,
-            'origin': origin,
         })
+
+    def electrode(self, id: str):
+        for e in self.electrodes:
+            if e['id'] == id:
+                return e['electrode']
+        raise IndexError(f'No electrode with id {id}')
 
     def to_dict(self):
         return {
@@ -94,18 +134,19 @@ class Peripheral(object):
             'origin': self.origin,
             'rotation': self.rotation,
             'electrodes': [
-                {'id': e['id'], 'polygon': e['electrode'].points, 'origin': e['origin']}
+                {'id': e['id'], 'polygon': e['electrode'].points, 'origin': e['electrode'].origin}
                 for e in self.electrodes
             ],
         }
 
-class Grid(object):
-    def __init__(self, origin: Tuple[float, float], size: Tuple[int, int], pitch: float):
+class Grid(GeometryContainer):
+    def __init__(self, origin: Tuple[float, float], size: Tuple[int, int], pitch: float, parent: GeometryContainer=None):
+        super().__init__(origin=origin, rotation=0.0, parent=parent)
         self.size = size
-        self.origin = origin
         self.pitch = pitch
         self.electrodes: Dict[Tuple[int, int], Electrode] = {}
 
 class BoardDesign(object):
     def __init__(self):
         self.grids: List[Grid] = []
+        self.peripherals: List[Peripheral] = []
