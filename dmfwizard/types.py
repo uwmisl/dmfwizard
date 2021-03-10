@@ -14,7 +14,7 @@ def make_transform_matrix(rotation, translation):
 class GeometryContainer(object):
     def __init__(self, origin: Tuple[float, float]=(0.0, 0.0), parent: 'GeometryContainer'=None, rotation: float=0.0):
         if origin is None:
-            origin = np.array([0., 0.])
+            origin = (0., 0.)
         self._parent = parent
         self.origin = origin
         self.rotation = rotation
@@ -29,7 +29,11 @@ class GeometryContainer(object):
             M = np.dot(self._parent.transform_matrix(), M)
         return M
 
-
+    def global_origin(self):
+        origin = self.origin
+        if self._parent is not None:
+            origin = np.add(origin, self._parent.global_origin()).tolist()
+        return origin
 class Electrode(GeometryContainer):
     def __init__(
             self,

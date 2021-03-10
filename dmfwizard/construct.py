@@ -78,6 +78,9 @@ class Constructor(object):
         board.peripherals.append(peripheral)
 
     def fill(self, grid: Grid, pos: Tuple[int, int]):
+        if pos in grid.electrodes:
+            # Location already filled
+            return
         grid.electrodes[pos] = Electrode(
             points=new_grid_square(grid.pitch),
             origin=(pos[0] * grid.pitch, pos[1] * grid.pitch),
@@ -90,8 +93,7 @@ class Constructor(object):
         for x,y in itertools.product(xpts, ypts):
             if x < 0 or x >= grid.size[0] or y < 0 or y >= grid.size[1]:
                 raise ValueError(f"Filling rectangle ({pos}/{size}) exceeds grid size ({grid.size})")
-            if (x, y) not in grid.electrodes:
-                self.fill(grid, (x, y))
+            self.fill(grid, (x, y))
 
     def fill_vert(self, grid: Grid, start: Tuple[int, int], distance: int):
         """Fill a vertical line
@@ -106,9 +108,7 @@ class Constructor(object):
 
             if x < 0 or x >= grid.size[0] or y < 0 or y >= grid.size[1]:
                 raise ValueError(f"Filling line ({start}/{distance}) exceeds grid size ({grid.size})")
-
             self.fill(grid, (x, y))
-
 
     def fill_horiz(self, grid: Grid, start: Tuple[int, int], distance: int):
         """Fill a horizontal line in a grid
@@ -123,6 +123,5 @@ class Constructor(object):
 
             if x < 0 or x >= grid.size[0] or y < 0 or y >= grid.size[1]:
                 raise ValueError(f"Filling line ({start}/{distance}) exceeds grid size ({grid.size})")
-
             self.fill(grid, (x, y))
 
