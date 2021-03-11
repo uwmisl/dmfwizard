@@ -7,6 +7,37 @@ import os
 
 from .construct import reduce_board_to_electrodes, offset_polygon
 
+def write_silkscreen_footprint(image: np.array, pixel_size: float, footprint_name: str, output_dir: str, description: str='Silk Screen Image'):
+    import KicadModTree as kmt
+    kicad_mod = kmt.Footprint(footprint_name)
+    kicad_mod.setDescription(description)
+
+    kicad_mod.append(kmt.Text(type="reference", text="", at=[0, -3], layer='F.SilkS', hide=True))
+    kicad_mod.append(kmt.Text(type="value", text="Fiducial", at=[1.5, 3], layer='F.Fab', hide=True))
+
+    h, w = image.shape
+
+    origin = np.array([-pixel_size*w/2, -pixel_size*h/2])
+    threshold = image.max() / 2
+
+    for row in range(h):
+        for col in range(w):
+            if image[row, col] < threshold:
+                continue
+            start = origin + (col * pixel_size, row * pixel_size)
+            end = start + (pixel_size, pixel_size)
+
+            kicad_mod.append(kmt.FilledRect(
+                start=start.tolist(),
+                end=end.tolist(),
+                layer='F.SilkS',
+                width=pixel_size / 1000,
+            ))
+
+    # output kicad model
+    file_handler = kmt.KicadFileHandler(kicad_mod)
+    file_handler.writeFile(os.path.join(output_dir, footprint_name + ".kicad_mod"))
+
 def write_electrode_footprint(e, library_path, footprint_name, clearance):
     import KicadModTree as kmt
 
@@ -17,20 +48,15 @@ def write_electrode_footprint(e, library_path, footprint_name, clearance):
     kicad_mod.append(kmt.Text(type="reference", text="REF**", at=[0, 0], layer='F.SilkS', hide=True))
     kicad_mod.append(kmt.Text(type="value", text="Electrode", at=[0, 0], layer='F.Fab', hide=True))
 
-    # We need a place to put the kicad "anchor pad" object. This needs to sit 
-    # within the polygon. This is not a great way to do this, as one could 
-    # easily create shapes for which the vertex centroid will actually be
-    # outside the polygon. At some point, this needs a better solution.
-    centroid = np.mean(e.points, axis=0).tolist()
     points = offset_polygon(e.points, -clearance/2.0)
-    points = [[p[0] - centroid[0], p[1] - centroid[1]] for p in points]
+    points = [[p[0] - e.anchor_pad[0], p[1] - e.anchor_pad[1]] for p in points]
     polygon = kmt.Polygon(nodes=points, layer='F.Cu', width=0.0001)
     pad = kicad_mod.append(kmt.Pad(
         number=1,
         type=kmt.Pad.TYPE_SMT,
         shape=kmt.Pad.SHAPE_CUSTOM,
-        at=centroid,
-        size=[0.01, 0.01],
+        at=e.anchor_pad,
+        size=[0.5, 0.5],
         layers=kmt.Pad.LAYERS_SMT,
         primitives=[polygon]
     ))
