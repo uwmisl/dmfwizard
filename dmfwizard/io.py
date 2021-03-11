@@ -16,7 +16,14 @@ def load_peripheral(filename) -> Peripheral:
 
     p = Peripheral(data['class'], data['type'])
     for e in data['electrodes']:
-        p.add_electrode(e['id'], Electrode(e['polygon'], parent=p))
+        p.add_electrode(
+            e['id'],
+            Electrode(
+                e['polygon'],
+                anchor_pad=e.get('anchor_pad', (0.0, 0.0)),
+                parent=p
+            )
+        )
 
     return p
 

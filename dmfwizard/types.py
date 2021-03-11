@@ -41,9 +41,11 @@ class Electrode(GeometryContainer):
             origin: Tuple[float, float]=(0.0, 0.0),
             refdes: int=-1,
             parent: GeometryContainer=None,
+            anchor_pad: Tuple[float, float]=(0.0, 0.0)
         ):
         super().__init__(origin, parent)
         self.origin = origin
+        self.anchor_pad = anchor_pad
         self.refdes = refdes
         if points is None:
             self.points = []
@@ -138,7 +140,12 @@ class Peripheral(GeometryContainer):
             'origin': self.origin,
             'rotation': self.rotation,
             'electrodes': [
-                {'id': e['id'], 'polygon': e['electrode'].points, 'origin': e['electrode'].origin}
+                {
+                    'id': e['id'],
+                    'polygon': e['electrode'].points,
+                    'origin': e['electrode'].origin,
+                    'anchor_pad': e['electrode'].anchor_pad,
+                }
                 for e in self.electrodes
             ],
         }

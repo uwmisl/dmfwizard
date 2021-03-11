@@ -83,6 +83,7 @@ class Constructor(object):
             return
         grid.electrodes[pos] = Electrode(
             points=new_grid_square(grid.pitch),
+            anchor_pad=(grid.pitch/2.0, grid.pitch/2.0),
             origin=(pos[0] * grid.pitch, pos[1] * grid.pitch),
             refdes=self.get_refdes(),
             parent=grid)
