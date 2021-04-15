@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 import numpy as np
 from typing import Dict, List, Tuple
@@ -20,6 +21,23 @@ class GeometryContainer(object):
         self.rotation = rotation
 
     @property
+    def origin(self):
+        return self._origin
+
+    @origin.setter
+    def origin(self, value):
+        if len(value) != 2:
+            raise ValueError("Origin must be set to a 2-tuple")
+        if isinstance(value, tuple):
+            self._origin = value
+        elif isinstance(value, list):
+            self._origin = tuple(value)
+        elif isinstance(value, np.ndarray):
+            self._origin = tuple(value.tolist())
+        else:
+            raise ValueError(f"Origin should be set to a 2-tuple, not '{value}'")
+
+    @property
     def parent(self):
         return self._parent
 
@@ -32,7 +50,7 @@ class GeometryContainer(object):
     def global_origin(self):
         origin = self.origin
         if self._parent is not None:
-            origin = np.add(origin, self._parent.global_origin()).tolist()
+            origin = tuple(np.add(origin, self._parent.global_origin()).tolist())
         return origin
 class Electrode(GeometryContainer):
     def __init__(
@@ -44,14 +62,16 @@ class Electrode(GeometryContainer):
             anchor_pad: Tuple[float, float]=(0.0, 0.0)
         ):
         super().__init__(origin, parent)
-        self.origin = origin
         self.anchor_pad = anchor_pad
         self.refdes = refdes
         if points is None:
             self.points = []
         else:
             self.points = points
-        self._parent
+
+    def copy(self):
+        newe = Electrode(deepcopy(self.points), self.origin, self.refdes, self.parent, self.anchor_pad)
+        return newe
 
     def num_edges(self):
         return len(self.points)
@@ -120,6 +140,18 @@ class Peripheral(GeometryContainer):
         self.id = None
         self.electrodes: List[Dict] = []
 
+    def copy(self):
+        """Returns a deep copy of object
+        """
+        if isinstance(self.origin, list):
+            raise ValueError("Peripheral.origin must be tuple, not list")
+        newperiph = Peripheral(self.peripheral_class, self.peripheral_type, self.parent)
+        newperiph.origin = self.origin
+        newperiph.rotation = self.rotation
+        newperiph.id = self.id
+        newperiph.electrodes = [{'id': e['id'], 'electrode': e['electrode'].copy()} for e in self.electrodes]
+        return newperiph
+
     def add_electrode(self, id: str, electrode: Electrode, origin:Tuple[float, float]=(0.0, 0.0)):
         self.electrodes.append({
             'id': id,
@@ -157,7 +189,30 @@ class Grid(GeometryContainer):
         self.pitch = pitch
         self.electrodes: Dict[Tuple[int, int], Electrode] = {}
 
+    def copy(self):
+        """Create a deep copy of the grid
+        """
+        newgrid = Grid(self.origin, self.size, self.pitch, self.parent)
+        newgrid.electrodes = {pos : e.copy() for pos, e in self.electrodes.items()}
+        return newgrid
+
+    @property
+    def width(self):
+        return self.size[0]
+
+    @property
+    def height(self):
+        return self.size[1]
+
 class BoardDesign(object):
     def __init__(self):
         self.grids: List[Grid] = []
         self.peripherals: List[Peripheral] = []
+
+    def copy(self):
+        """Create a deep copy of the board
+        """
+        newboard = BoardDesign()
+        newboard.grids = [g.copy() for g in self.grids]
+        newboard.peripherals = [p.copy() for p in self.peripherals]
+        return newboard

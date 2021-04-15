@@ -8,7 +8,7 @@ import string
 from dmfwizard.io import read_dxf
 from dmfwizard.types import Electrode, Peripheral
 from dmfwizard.construct import offset_polygon
-
+from dmfwizard.kicad import extract_electrode_nets
 
 def periph_id(n):
     """Return A-Z, then AA, AB, etc.
@@ -151,6 +151,35 @@ def _import(type, pclass, out, files, force, plot):
         ax.invert_yaxis()
         plt.show()
 
+@main.command()
+@click.argument('pcbfile')
+@click.option('--regex', '-r', help='Regex to extract pin from net name', default=r'/P(\d+)')
+@click.option('--net', '-n', help='Output net name instead of pin number', is_flag=True)
+@click.option('--out', '-o', help='Write output to file instead of stdout')
+def netextract(pcbfile, regex, net, out=None):
+    """Extract map of refdes to netname or pin number from PCB file
+    """
+    import re
+
+    net_table = extract_electrode_nets(pcbfile)
+
+    if net:
+        table = net_table
+    else:
+        table = {}
+        for refdes, net_name in net_table.items():
+            match = re.match(regex, net_name)
+            if match is None:
+                print(f"Failed to match pin number from net '{net_name}'")
+            else:
+                pin = int(match.group(1))
+                table[refdes] = pin
+
+    if out is not None:
+        with open(out, 'w') as f:
+            f.write(json.dumps(table))
+    else:
+        print(json.dumps(table))
 
 if __name__ == '__main__':
     main()

@@ -4,8 +4,23 @@ import yaml
 import math
 import numpy as np
 import os
+from typing import Dict
 
 from .construct import reduce_board_to_electrodes, offset_polygon
+
+def extract_electrode_nets(pcbfile: str) -> Dict[str, int]:
+    import pcbnew
+    import re
+
+    table = {}
+    board = pcbnew.LoadBoard(pcbfile)
+    for pad in board.GetPads():
+        mod = pad.GetParent()
+        refdes = mod.GetReference()
+        if re.match('E\d+', refdes):
+            net_name = pad.GetNet().GetNetname()
+            table[refdes] = net_name
+    return table
 
 def write_silkscreen_footprint(image: np.array, pixel_size: float, footprint_name: str, output_dir: str, description: str='Silk Screen Image'):
     import KicadModTree as kmt
