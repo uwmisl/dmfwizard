@@ -3,7 +3,7 @@ import json
 import os
 import shapely
 import string
-
+import sys
 
 from dmfwizard.io import read_dxf
 from dmfwizard.types import Electrode, Peripheral
@@ -110,6 +110,10 @@ def _import(type, pclass, out, files, force, plot):
     labeled in the order provided.
     """
     polygons = []
+
+    if len(files) == 0:
+        print("No input files provided!")
+        sys.exit(1)
 
     for fname in files:
         _, ext = os.path.splitext(fname)
