@@ -57,9 +57,12 @@ def read_dxf(filename):
 
     for e in msp.query():
         if isinstance(e, ezdxf.entities.LWPolyline):
-            for i in range(1, len(e)):
-                p0 = e[i-1]
-                p1 = el[i]
+            for i in range(0, len(e)):
+                if i == 0:
+                    p0 = e[-1]
+                else:
+                    p0 = e[i-1]
+                p1 = e[i]
                 lines.append(((p0[0], p0[1]), (p1[0], p1[1])))
         elif isinstance(e, ezdxf.entities.Line):
             lines.append(reduce_line(e))
@@ -79,7 +82,7 @@ def read_dxf(filename):
     SCALE_FACTOR = 1e6
     lines = np.array(lines)
     lines = np.round((lines * SCALE_FACTOR)).astype(np.int32).tolist()
-    
+
     # import matplotlib.pyplot as plt
     # fig, ax = plt.subplots()
     # for l in lines:
