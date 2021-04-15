@@ -40,14 +40,14 @@ def write_silkscreen_footprint(image: np.array, pixel_size: float, footprint_nam
             if image[row, col] < threshold:
                 continue
             start = origin + (col * pixel_size, row * pixel_size)
-            end = start + (pixel_size, pixel_size)
 
-            kicad_mod.append(kmt.FilledRect(
-                start=start.tolist(),
-                end=end.tolist(),
-                layer='F.SilkS',
-                width=pixel_size / 1000,
-            ))
+            points = [
+                start.tolist(),
+                (start + (pixel_size, 0)).tolist(),
+                (start + (pixel_size, pixel_size)).tolist(),
+                (start + (0, pixel_size)).tolist(),
+                ]
+            kicad_mod.append(kmt.Polygon(nodes=points, layer='F.SilkS', width=0.001))
 
     # output kicad model
     file_handler = kmt.KicadFileHandler(kicad_mod)
