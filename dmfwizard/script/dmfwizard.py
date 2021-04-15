@@ -100,8 +100,9 @@ def main():
 @click.option('--out', '-o', help="Output path")
 @click.option('--force', '-f', is_flag=True)
 @click.option('--plot', is_flag=True)
+@click.option('--verbose', '-v', is_flag=True)
 @click.argument('files', nargs=-1)
-def _import(type, pclass, out, files, force, plot):
+def _import(type, pclass, out, files, force, plot, verbose):
     """Import geometry to a peripheral file
 
     Supported input formats: DXF
@@ -124,6 +125,10 @@ def _import(type, pclass, out, files, force, plot):
         else:
             raise ValueError(f"Unsupport input extension: {ext}")
 
+    if verbose:
+        print(f"Detected {len(polygons)} polygons:")
+        for p in polygons:
+            print(p)
 
     electrodes = [Electrode(p) for p in polygons]
     # Interactively add anchor pad locations and assign IDs to the polygons
