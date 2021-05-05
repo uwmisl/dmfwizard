@@ -5,19 +5,21 @@ from typing import Optional, Tuple
 
 def do_edges_overlap(line_a, line_b):
     """True if lines are co-linear and one is contained completely within the other
+
+    :meta private:
     """
 
     TOL = 1e-12
     line_a = np.array(line_a)
     line_b = np.array(line_b)
-    
+
     # make vectors from line_b points to both ends of line_a
     # If the cross product is zero, they are colinear
     xp0 = np.cross(line_b[0] - line_a[0], line_b[0] - line_a[1])
     xp1 = np.cross(line_b[1] - line_a[0], line_b[1] - line_a[1])
     if not np.isclose(xp0, 0.0) or not np.isclose(xp1, 0.0):
         return False
-    
+
     # offset lines so origin is at line_a[0]
     line_b -= line_a[0]
     line_a -= line_a[0]
@@ -39,6 +41,8 @@ def find_overlapping_edges(a: Electrode, b: Electrode) -> Optional[Tuple[int, in
 
     For our purposes, electrodes should abutt each other, but not overlap, so
     there can only be a single overlapping edge. This functions returns the first found.
+
+    :meta private:
     """
     for edge_a, edge_b in itertools.product(range(a.num_edges()), range(b.num_edges())):
         if do_edges_overlap(a.offset_edge(edge_a), b.offset_edge(edge_b)):
@@ -54,12 +58,23 @@ def are_edges_flipped(a, b):
 def crenellate_electrodes(
         a: Electrode,
         b: Electrode,
-        num_digits,
-        theta,
-        margin=0.0,
+        num_digits: int,
+        theta: float,
+        margin:float=0.0,
         edge_a_idx: int=-1,
         edge_b_idx: int=-1
         ):
+    """Create crenellation on the shared edge between a pair of electrodes
+
+    Args:
+      a: The first electrode
+      b: The second electrode, which must share an edge with the other
+      num_digits: The number of crenellations to create
+      theta: The angle of each crenellation, in radians
+      margin: The distance from the corners to begin crenellation
+      edge_a_idx: Optional, provide an index indicating which edge in electrode a is to be used
+      edge_b_idx: Indicates which edge in electrode b to use; must be provided if edge_a_idx is provided.
+    """
     if (edge_a_idx == -1 or edge_b_idx == -1) and edge_b_idx != edge_a_idx:
         raise ValueError("If one edge is provided, the other must be also")
     if edge_a_idx == -1:
@@ -92,14 +107,16 @@ def crenellate_electrodes(
     b.insert_offset_points(edge_b_idx+1, insert_list)
 
 def create_crenellated_edge(start, end, num_digits, theta, margin):
-    """Create a interdigitating edge along the line 
+    """Create an interleaved edge along the given line
 
-    Arguments: 
-      - start: The (x,y) coordinate of the line start
-      - end: The (x,y) coordinate of the line end
-      - num_digits: The number of fingers or crenellations to create
-      - theta: The angle of one finger
-      - margin: The space to leave from the start and end of the line
+    :meta private:
+
+    Arguments:
+      start: The (x,y) coordinate of the line start
+      end: The (x,y) coordinate of the line end
+      num_digits: The number of fingers or crenellations to create
+      theta: The angle of one finger, in radians
+      margin: The space to leave from the start and end of the line
     """
 
     start = np.array(start)
@@ -116,7 +133,7 @@ def create_crenellated_edge(start, end, num_digits, theta, margin):
         for i in range(n):
             if (i % 2) == 0:
                 pts.append(1.0)
-            else: 
+            else:
                 pts.append(-1.0)
         return pts
 

@@ -4,13 +4,26 @@ import yaml
 import math
 import numpy as np
 import os
-from typing import Dict
+import re
+from typing import Dict, Tuple
 
-from .construct import reduce_board_to_electrodes, offset_polygon
+from .types import BoardDesign
+from .construct import offset_polygon
 
-def extract_electrode_nets(pcbfile: str) -> Dict[str, int]:
+def extract_electrode_nets(pcbfile: str) -> Dict[str, str]:
+    """Get connected net names for all electrodes in a .kicad_pcb file
+
+    Find all components with E* reference designators, and return a table with
+    the assigned net for each. It is assumed that all components have only a
+    single pad. The returned table has the reference designator as keys, and
+    the net names as values.
+
+    Args:
+        pcbfile: The '.kicad_pcb' design file to read
+    """
+    # Import pcbnew late, only when needed, to avoid adding the dependency for
+    # other functions
     import pcbnew
-    import re
 
     table = {}
     board = pcbnew.LoadBoard(pcbfile)
@@ -23,6 +36,17 @@ def extract_electrode_nets(pcbfile: str) -> Dict[str, int]:
     return table
 
 def write_silkscreen_footprint(image: np.array, pixel_size: float, footprint_name: str, output_dir: str, description: str='Silk Screen Image'):
+    """Generates a silkscreen footprint from an image
+
+    Any pixels in the images greater than `image.max()/2` will be filled with silkscreen, other pixels will be left blank.
+
+    Args:
+        image: A numpy array containing source pixels
+        pixel_size: The size of each pixel in the output, in mm
+        footprint_name: The name of the KiCad footprint to be created
+        output_dir: The directory to which the `.kicad_mod` file will be written
+        description: The value to fill into the 'description' field of the KiCad footprint
+    """
     import KicadModTree as kmt
     kicad_mod = kmt.Footprint(footprint_name)
     kicad_mod.setDescription(description)
@@ -86,11 +110,23 @@ def ensure_directory_exists(path):
         if e.errno != errno.EEXIST:
             raise
 
-def save_board(board, origin, proj_dir, clearance):
+def save_board(board: BoardDesign, origin: Tuple[float, float], proj_dir: str, clearance: float):
+    """Save KiCad files for a BoardDesign
+
+    This method writes footprints for all electrodes, and a layout.yaml file
+    with their position information. Electrode footprints are stored in
+    `proj_dir/electrodes.pretty`.
+
+    Args:
+        board: The BoardDesign object describing the design
+        origin: The location in the KiCad PCB at which the board origin will be placed
+        proj_dir: The output location. This should be the kicad project directory.
+        clearance: The copper-to-copper gap to be used when generating footprints
+    """
     footprint_library = os.path.join(proj_dir, "electrodes.pretty")
 
     ensure_directory_exists(footprint_library)
-    electrodes = reduce_board_to_electrodes(board)
+    electrodes = board.all_electrodes()
 
     layout = {
         'origin': list(origin),
@@ -113,5 +149,5 @@ def save_board(board, origin, proj_dir, clearance):
             },
         }
 
-    with open('layout.yaml', 'w') as f:
+    with open(os.path.join(proj_dir, 'layout.yaml'), 'w') as f:
         f.write(yaml.dump(layout))

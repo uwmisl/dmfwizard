@@ -1,8 +1,10 @@
+"""Contains tools for defining the electrode board layout
+"""
 import itertools
 import math
 import numpy as np
 import pyclipper
-from typing import Tuple
+from typing import List, Sequence, Tuple
 from .types import BoardDesign, Electrode, Grid, Peripheral
 from .crenellation import crenellate_electrodes
 
@@ -29,12 +31,28 @@ def reduce_board_to_electrodes(board):
 
     return electrodes
 
-def offset_polygon(poly, offset):
+def offset_polygon(poly: Sequence[Tuple[float, float]], offset: float) -> List[Tuple[float, float]]:
+    """Offset a polygon by given amount
+
+    This can be used to pull back polygons to create clearance gap between
+    them, by providing a negative offset.
+    """
     pco = pyclipper.PyclipperOffset()
     pco.AddPath(pyclipper.scale_to_clipper(poly), pyclipper.JT_MITER, pyclipper.ET_CLOSEDPOLYGON)
     return pyclipper.scale_from_clipper(pco.Execute(pyclipper.scale_to_clipper(offset)))[0]
 
-def crenellate_grid(grid, num_digits, theta, margin):
+def crenellate_grid(grid: Grid, num_digits: int, theta: float, margin: float):
+    """Crenellate all of the electrode interfaces in a grid of electrodes
+
+    This will modify the polygons of electrodes in place.
+
+    Args:
+        grid: The grid whose electrodes will be modified
+        num_digits: crenellation parameter (see :py:meth:`dmfwizard.crenellation.crenellate_electrodes`)
+        theta: crenellation parameter (see :py:meth:`dmfwizard.crenellation.crenellate_electrodes`)
+        margin: crenellation parameter (see :py:meth:`dmfwizard.crenellation.crenellate_electrodes`)
+    """
+
     xpts = range(grid.size[0])
     ypts = range(grid.size[1])
     for x,y in itertools.product(xpts, ypts):
@@ -50,11 +68,20 @@ def crenellate_grid(grid, num_digits, theta, margin):
                         raise
 
 class Constructor(object):
+    """Class to add electrodes to a design
+
+    All electrodes for a board should be added via the same Constructor object,
+    as it keeps track of IDs and electrode designators
+    """
     def __init__(self):
         self.next_refdes = 1
         self.next_periph_id = 1
 
-    def get_refdes(self):
+    def get_refdes(self) -> int:
+        """Allocate and return a new reference designator for an electrode
+
+        :meta private:
+        """
         refdes = self.next_refdes
         self.next_refdes += 1
         return refdes
@@ -76,8 +103,11 @@ class Constructor(object):
         peripheral.origin = position
         peripheral.rotation = rotation
         board.peripherals.append(peripheral)
+        return peripheral
 
     def fill(self, grid: Grid, pos: Tuple[int, int]):
+        """Fill electrode at a single grid location
+        """
         if pos in grid.electrodes:
             # Location already filled
             return
@@ -89,6 +119,13 @@ class Constructor(object):
             parent=grid)
 
     def fill_rect(self, grid: Grid, pos: Tuple[int, int], size: Tuple[int, int]):
+        """Fill in a rectangle with electrodes
+
+        Args:
+            grid: The Grid object to fill
+            pos: The position of the top-left electrode in the rectangle
+            size: The size of the rectangle, (width, height), in electrodes
+        """
         xpts = range(pos[0], pos[0] + size[0])
         ypts = range(pos[1], pos[1] + size[1])
         for x,y in itertools.product(xpts, ypts):
@@ -125,4 +162,33 @@ class Constructor(object):
             if x < 0 or x >= grid.size[0] or y < 0 or y >= grid.size[1]:
                 raise ValueError(f"Filling line ({start}/{distance}) exceeds grid size ({grid.size})")
             self.fill(grid, (x, y))
+
+    def fill_ascii(self, grid: Grid, diagram: str):
+        """Fill in the grid based on ASCII art
+
+        Each line in the input string describes a row in the grid; Any character except
+        spaces or underscores denote a filled location. The first string with
+        non-white-space characters will be interpreted as the first row. If you
+        wish to leave empty rows at the top, you can denote an empty row with
+        an underscore, '_'.
+
+        Args:
+            grid: The grid in which electrodes will be created
+            diagram: The ascii art string describing the electrodes to add
+        """
+
+        # Remove any blank lines at the start of the string
+        lines = []
+        found_non_blank = False
+        for line in diagram.splitlines():
+            if not found_non_blank and line.isspace():
+                continue
+            lines.append(line)
+        for row, line in enumerate(lines):
+            for i, ch in enumerate(line):
+                if ch != '_' and ch != ' ':
+                    self.fill(grid, (i, row))
+
+
+
 

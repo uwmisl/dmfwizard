@@ -98,17 +98,15 @@ def main():
 @click.option('--type', help='The unique type name of the periheral')
 @click.option('--class', 'pclass', help="reservoir is currently the only supported type", default='reservoir')
 @click.option('--out', '-o', help="Output path")
-@click.option('--force', '-f', is_flag=True)
-@click.option('--plot', is_flag=True)
-@click.option('--verbose', '-v', is_flag=True)
+@click.option('--force', '-f', is_flag=True, help="Overwrite output file if it already exists")
+@click.option('--verbose', '-v', is_flag=True, help="Print more verbose diagnostic information")
 @click.argument('files', nargs=-1)
 def _import(type, pclass, out, files, force, plot, verbose):
-    """Import geometry to a peripheral file
+    """Import geometry from FILES to a peripheral file
 
     Supported input formats: DXF
 
-    If multiple input files are specified, they will be combined and electrodes
-    labeled in the order provided.
+    If multiple input files are specified, all polygons from all files will be combined.
     """
     polygons = []
 
@@ -146,27 +144,17 @@ def _import(type, pclass, out, files, force, plot, verbose):
     else:
         print(json.dumps(periph.to_dict()))
 
-    if plot:
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as patches
-        fig, ax = plt.subplots()
-        for item in periph.electrodes:
-            id = item['id']
-            e = item['electrode']
-            ax.add_patch(patches.Polygon(offset_polygon(e.offset_points(), -0.1), fill=False))
-
-        ax.autoscale()
-        ax.axis('square')
-        ax.invert_yaxis()
-        plt.show()
 
 @main.command()
 @click.argument('pcbfile')
-@click.option('--regex', '-r', help='Regex to extract pin from net name', default=r'/P(\d+)')
+@click.option('--regex', '-r', help='Regex to extract pin from net name (default: "/P(\d+)")', default=r'/P(\d+)')
 @click.option('--net', '-n', help='Output net name instead of pin number', is_flag=True)
 @click.option('--out', '-o', help='Write output to file instead of stdout')
 def netextract(pcbfile, regex, net, out=None):
-    """Extract map of refdes to netname or pin number from PCB file
+    """Extract map of refdes to netname or pin number from KiCad PCB file
+
+    All components with designator E? will be extracted. It is assumed that each
+    component has only one pad.
     """
     import re
 
