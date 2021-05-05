@@ -1,4 +1,4 @@
 myst_parser
-spinx_click
+sphinx_click
 git+https://github.com/sphinx-contrib/video
 
