@@ -3,8 +3,9 @@
 A python library to make it easier to experiment with digital microfluidics.
 
 ## What it does
-
-![Example electrode board](images/electrode_board.png?raw=true "Example board")
+<p align="center">
+  <img class="align-center" src="images/electrode_board.png?raw=true" width=400 />
+</p>
 
 DMF devices use arrays of electrodes laid out on a subtrate to control small
 droplets of fluids. One really cheap and easy way to fabricate these substrates
