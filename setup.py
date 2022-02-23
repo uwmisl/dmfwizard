@@ -12,6 +12,7 @@ setup(
     install_requires=[
         'click',
         'numpy',
+        'pyclipper',
         'shapely',
         'ezdxf',
     ],
